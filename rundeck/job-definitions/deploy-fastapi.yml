@@ -1,0 +1,64 @@
+- defaultTab: nodes
+  description: |
+    Deploys the FastAPI application via Ansible.
+    Runs a rolling git-pull deploy across all app_servers,
+    one node at a time, with health checks after each.
+  executionEnabled: true
+  group: deployments
+  id: deploy-fastapi-app
+  loglevel: INFO
+  name: Deploy FastAPI App
+  nodeFilterEditable: false
+
+  options:
+    - name: branch
+      label: Git Branch
+      description: Branch to deploy
+      value: main
+      required: true
+      enforced: false
+
+    - name: target
+      label: Target Nodes
+      description: "Ansible limit expression (e.g. 'app-node-1' or 'all')"
+      value: all
+      required: true
+      enforced: false
+
+  sequence:
+    keepgoing: false
+    strategy: node-first
+    commands:
+
+      # Step 1 — Ping nodes to confirm SSH connectivity
+      - description: "Ping all target nodes"
+        exec: >
+          ansible
+          {{ option.target }}
+          -i /home/rundeck/ansible/inventory/hosts.ini
+          -m ping
+
+      # Step 2 — Run the deploy playbook
+      - description: "Run deploy playbook"
+        exec: >
+          ansible-playbook
+          /home/rundeck/ansible/playbooks/deploy.yml
+          -i /home/rundeck/ansible/inventory/hosts.ini
+          --limit {{ option.target }}
+          -e "app_branch={{ option.branch }}"
+          -v
+
+      # Step 3 — Quick curl health check from Rundeck side
+      - description: "Spot-check node 1 health endpoint"
+        exec: curl -sf http://app-node-1:8000/health
+
+  notification:
+    onfailure:
+      email:
+        # swap in real addresses or use a Slack webhook plugin
+        recipients: ops@yourlab.local
+        subject: "FAILED: FastAPI deploy ({{ option.branch }})"
+    onsuccess:
+      email:
+        recipients: ops@yourlab.local
+        subject: "OK: FastAPI deploy ({{ option.branch }}) complete"

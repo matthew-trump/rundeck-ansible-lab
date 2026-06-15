@@ -1,0 +1,40 @@
+---
+# playbooks/deploy.yml
+# Run:  ansible-playbook playbooks/deploy.yml
+#       ansible-playbook playbooks/deploy.yml --limit app-node-1
+#       ansible-playbook playbooks/deploy.yml -e "app_branch=staging"
+
+- name: Deploy FastAPI application
+  hosts: app_servers
+  gather_facts: yes
+  serial: 1          # rolling deploy — one node at a time
+
+  vars:
+    app_dir: /srv/app
+    app_port: 8000
+    app_branch: main
+
+  pre_tasks:
+    - name: Record deploy start time
+      set_fact:
+        deploy_start: "{{ ansible_date_time.iso8601 }}"
+
+    - name: Print deploy banner
+      debug:
+        msg: |
+          ┌─────────────────────────────────────┐
+          │  Deploying to: {{ inventory_hostname }}
+          │  Branch:       {{ app_branch }}
+          │  Started:      {{ deploy_start }}
+          └─────────────────────────────────────┘
+
+  roles:
+    - deploy-app
+
+  post_tasks:
+    - name: Deploy summary
+      debug:
+        msg: |
+          ✓ Deploy complete on {{ inventory_hostname }}
+          ✓ Health check passed
+          ✓ Finished: {{ ansible_date_time.iso8601 }}

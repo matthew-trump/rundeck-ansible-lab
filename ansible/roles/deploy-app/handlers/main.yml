@@ -1,0 +1,9 @@
+---
+# roles/deploy-app/handlers/main.yml
+
+- name: Verify app health
+  uri:
+    url: "http://{{ ansible_host }}:{{ app_port }}/health"
+    return_content: yes
+  register: health_check
+  failed_when: health_check.json.status != 'healthy'

@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+
+  # ── Rundeck ──────────────────────────────────────────────────────────────────
+  rundeck:
+    image: rundeck/rundeck:5.1.0
+    container_name: rundeck
+    environment:
+      RUNDECK_GRAILS_URL: http://localhost:4440
+      RUNDECK_SERVER_ADDRESS: 0.0.0.0
+      # Pre-create an admin user (admin / admin)
+      RUNDECK_SECURITY_HTTPBASIC_ENABLED: "true"
+    ports:
+      - "4440:4440"
+    volumes:
+      - rundeck-data:/home/rundeck/server/data
+      - ./rundeck/job-definitions:/home/rundeck/job-definitions:ro
+      # Give Rundeck access to Ansible and SSH key
+      - ansible-ssh:/home/rundeck/.ssh:ro
+      - ./ansible:/home/rundeck/ansible:ro
+    depends_on:
+      - ansible
+    networks:
+      - lab
+
+  # ── Ansible control node ──────────────────────────────────────────────────────
+  ansible:
+    build:
+      context: .
+      dockerfile: Dockerfile.ansible
+    container_name: ansible
+    volumes:
+      - ./ansible:/ansible
+      - ansible-ssh:/root/.ssh
+    networks:
+      - lab
+    # Keep container alive
+    command: ["tail", "-f", "/dev/null"]
+
+  # ── App node 1 ────────────────────────────────────────────────────────────────
+  app-node-1:
+    build:
+      context: ./app-node
+      dockerfile: Dockerfile.node
+    container_name: app-node-1
+    networks:
+      - lab
+    ports:
+      - "8001:8000"   # FastAPI accessible on host for testing
+
+  # ── App node 2 ────────────────────────────────────────────────────────────────
+  app-node-2:
+    build:
+      context: ./app-node
+      dockerfile: Dockerfile.node
+    container_name: app-node-2
+    networks:
+      - lab
+    ports:
+      - "8002:8000"
+
+volumes:
+  rundeck-data:
+  ansible-ssh:    # shared SSH keypair between ansible and rundeck containers
+
+networks:
+  lab:
+    driver: bridge

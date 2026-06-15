@@ -1,0 +1,37 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    openssh-server \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    curl \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create deploy user
+RUN useradd -m -s /bin/bash deploy && \
+    echo "deploy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# SSH setup
+RUN mkdir -p /var/run/sshd && \
+    mkdir -p /home/deploy/.ssh && \
+    chown deploy:deploy /home/deploy/.ssh && \
+    chmod 700 /home/deploy/.ssh
+
+# Configure SSH: disable password auth, allow pubkey
+RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+# Set up a fake git repo for the app (simulates your Linode git pull workflow)
+RUN mkdir -p /srv/app && chown deploy:deploy /srv/app
+
+# Bootstrap script: initialize repo + install app
+COPY bootstrap-node.sh /usr/local/bin/bootstrap-node.sh
+RUN chmod +x /usr/local/bin/bootstrap-node.sh
+
+EXPOSE 22 8000
+
+CMD ["/usr/local/bin/bootstrap-node.sh"]

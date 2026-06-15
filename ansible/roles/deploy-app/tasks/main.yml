@@ -1,0 +1,82 @@
+---
+# roles/deploy-app/tasks/main.yml
+# Mirrors a real Linode git-pull deployment workflow.
+
+- name: Ensure app directory exists
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0755"
+
+- name: Pull latest code from git
+  git:
+    repo: "{{ app_repo }}"
+    dest: "{{ app_dir }}"
+    version: "{{ app_branch }}"
+    force: yes
+  register: git_result
+  # In the lab (no real repo), we skip this and use the stub app already on disk.
+  # Remove the 'ignore_errors' line when pointing at a real repo.
+  ignore_errors: yes
+
+- name: Show git pull result
+  debug:
+    msg: "Git: {{ git_result.after | default('(lab mode - no real repo)') }}"
+
+- name: Ensure virtualenv exists
+  command: python3 -m venv "{{ app_dir }}/venv"
+  args:
+    creates: "{{ app_dir }}/venv/bin/activate"
+
+- name: Install / upgrade Python dependencies
+  pip:
+    requirements: "{{ app_dir }}/requirements.txt"
+    virtualenv: "{{ app_dir }}/venv"
+    state: present
+  # requirements.txt is optional in lab mode
+  ignore_errors: yes
+
+- name: Restart the FastAPI service
+  become: yes
+  systemd:
+    name: "{{ app_service }}"
+    state: restarted
+    daemon_reload: yes
+  notify: Verify app health
+  # In lab mode (no systemd), we use the supervisor-style approach below.
+  ignore_errors: yes
+
+- name: Lab mode — bounce app process via pkill + restart
+  shell: |
+    pkill -f "uvicorn main:app" || true
+    sleep 1
+    cd {{ app_dir }}
+    nohup ./venv/bin/uvicorn main:app --host 0.0.0.0 --port {{ app_port }} \
+      >> /tmp/app.log 2>&1 &
+    echo "App restarted. PID=$!"
+  args:
+    executable: /bin/bash
+  register: restart_output
+
+- name: Show restart output
+  debug:
+    var: restart_output.stdout
+
+- name: Wait for app to come up
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ app_port }}"
+    delay: 2
+    timeout: 30
+
+- name: Health check
+  uri:
+    url: "http://{{ ansible_host }}:{{ app_port }}/health"
+    return_content: yes
+  register: health_response
+
+- name: Show health check result
+  debug:
+    msg: "Health: {{ health_response.json }}"
