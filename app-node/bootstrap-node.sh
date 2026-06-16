@@ -20,20 +20,12 @@ if [ ! -d /srv/app/.git ]; then
     echo "[bootstrap] Initializing app repo..."
     cd /srv/app
     git init
-    git config user.email "deploy@lab"
-    git config user.name "Deploy"
     cp /tmp/app-init/* /srv/app/ 2>/dev/null || true
+    git config --local user.email "deploy@lab" || true
+    git config --local user.name "Deploy" || true
+    chown -R deploy:deploy /srv/app
 fi
 
-# Create venv and install dependencies if not present
-if [ ! -d /srv/app/venv ]; then
-    echo "[bootstrap] Creating virtualenv..."
-    cd /srv/app
-    python3 -m venv venv
-    ./venv/bin/pip install --quiet fastapi uvicorn
-fi
-
-# Start the FastAPI app
-echo "[bootstrap] Starting FastAPI app..."
-cd /srv/app
-exec ./venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+chown -R deploy:deploy /srv/app
+echo "[bootstrap] Node ready; setup.sh will install and start the app."
+tail -f /dev/null

@@ -4,7 +4,9 @@ services:
 
   # ── Rundeck ──────────────────────────────────────────────────────────────────
   rundeck:
-    image: rundeck/rundeck:5.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile.rundeck
     container_name: rundeck
     environment:
       RUNDECK_GRAILS_URL: http://localhost:4440
@@ -18,6 +20,7 @@ services:
       - ./rundeck/job-definitions:/home/rundeck/job-definitions:ro
       # Give Rundeck access to Ansible and SSH key
       - ansible-ssh:/home/rundeck/.ssh:ro
+      - ./ansible:/ansible:ro
       - ./ansible:/home/rundeck/ansible:ro
     depends_on:
       - ansible

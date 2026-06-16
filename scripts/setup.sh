@@ -20,6 +20,7 @@ docker exec ansible bash -c "
     fi
     chmod 600 /root/.ssh/lab_key
     chmod 644 /root/.ssh/lab_key.pub
+    chown 1000:0 /root/.ssh /root/.ssh/lab_key /root/.ssh/lab_key.pub
 "
 
 # 2. Grab the public key
@@ -57,10 +58,14 @@ for NODE in app-node-1 app-node-2; do
     # Start the app (background)
     docker exec --user deploy ${NODE} bash -c "
         cd /srv/app
-        pkill -f uvicorn || true
+        if [ -f /tmp/app.pid ]; then
+            kill \$(cat /tmp/app.pid) 2>/dev/null || true
+            rm -f /tmp/app.pid
+        fi
         sleep 1
         nohup ./venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 \
           >> /tmp/app.log 2>&1 &
+        echo \$! > /tmp/app.pid
         echo 'App started on port 8000'
     "
 

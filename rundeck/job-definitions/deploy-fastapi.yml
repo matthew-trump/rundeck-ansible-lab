@@ -33,19 +33,29 @@
       # Step 1 — Ping nodes to confirm SSH connectivity
       - description: "Ping all target nodes"
         exec: >
+          ANSIBLE_CONFIG=/ansible/ansible.cfg
           ansible
           {{ option.target }}
-          -i /home/rundeck/ansible/inventory/hosts.ini
+          -i /ansible/inventory/hosts.ini
+          --private-key /home/rundeck/.ssh/lab_key
+          -u deploy
+          -e "ansible_ssh_private_key_file=/home/rundeck/.ssh/lab_key"
+          -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
           -m ping
 
       # Step 2 — Run the deploy playbook
       - description: "Run deploy playbook"
         exec: >
+          ANSIBLE_CONFIG=/ansible/ansible.cfg
           ansible-playbook
-          /home/rundeck/ansible/playbooks/deploy.yml
-          -i /home/rundeck/ansible/inventory/hosts.ini
+          /ansible/playbooks/deploy.yml
+          -i /ansible/inventory/hosts.ini
+          --private-key /home/rundeck/.ssh/lab_key
+          -u deploy
           --limit {{ option.target }}
           -e "app_branch={{ option.branch }}"
+          -e "ansible_ssh_private_key_file=/home/rundeck/.ssh/lab_key"
+          -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
           -v
 
       # Step 3 — Quick curl health check from Rundeck side

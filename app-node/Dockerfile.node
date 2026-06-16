@@ -28,6 +28,9 @@ RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd
 # Set up a fake git repo for the app (simulates your Linode git pull workflow)
 RUN mkdir -p /srv/app && chown deploy:deploy /srv/app
 
+# Seed the lab app so the node can start before setup.sh injects SSH keys.
+COPY app/ /tmp/app-init/
+
 # Bootstrap script: initialize repo + install app
 COPY bootstrap-node.sh /usr/local/bin/bootstrap-node.sh
 RUN chmod +x /usr/local/bin/bootstrap-node.sh
